@@ -9,11 +9,19 @@ use core::ops::{Deref, DerefMut};
 /// Byte range in the source.
 pub type Span = core::ops::Range<usize>;
 
+#[allow(private_interfaces)]
+#[derive(Clone)]
+pub(crate) enum OneOrMany<Token> {
+    One(Token),
+    Many(Vec<Token>)
+}
+
 /// `Lexer` is the main struct of the crate that allows you to read through a
 /// `Source` and produce tokens for enums implementing the `Logos` trait.
 pub struct Lexer<'source, Token: Logos<'source>> {
     source: &'source Token::Source,
-    token: ManuallyDrop<Option<Result<Token, Token::Error>>>,
+    token: ManuallyDrop<Option<Result<OneOrMany<Token>, Token::Error>>>,
+    many: Option<Vec<Token>>,
     token_start: usize,
     token_end: usize,
 
@@ -58,6 +66,7 @@ impl<'source, Token: Logos<'source>> Lexer<'source, Token> {
             extras,
             token_start: 0,
             token_end: 0,
+            many: None
         }
     }
 
@@ -167,6 +176,7 @@ impl<'source, Token: Logos<'source>> Lexer<'source, Token> {
             extras: self.extras.into(),
             token_start: self.token_start,
             token_end: self.token_end,
+            many: None
         }
     }
 
@@ -195,6 +205,7 @@ where
         Lexer {
             extras: self.extras.clone(),
             token: self.token.clone(),
+            many: self.many.clone(),
             ..*self
         }
     }
@@ -208,6 +219,14 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Result<Token, Token::Error>> {
+        if let Some(v) = &mut self.many {
+            let len = v.len();
+            if len == 0 {
+                self.many = None;
+                return self.next()
+            }
+            return Some(Ok(v.remove(len - 1)))
+        }
         self.token_start = self.token_end;
 
         Token::lex(self);
@@ -216,7 +235,15 @@ where
         // Since we always immediately return a newly set token here,
         // we don't have to replace it with `None` or manually drop
         // it later.
-        unsafe { ManuallyDrop::take(&mut self.token) }
+        match unsafe { ManuallyDrop::take(&mut self.token) } {
+            Some(Ok(OneOrMany::One(t))) => Some(Ok(t)),
+            Some(Ok(OneOrMany::Many(v))) => {
+                self.many = Some(v);
+                self.next()
+            },
+            Some(Err(r)) => Some(Err(r)),
+            None => None,
+        }
     }
 }
 
@@ -373,6 +400,17 @@ where
             <<Self as LexerInternal<'source>>::Token as Logos<'source>>::Error,
         >,
     ) {
-        self.token = ManuallyDrop::new(Some(token));
+        self.token = ManuallyDrop::new(Some(token.map(OneOrMany::One)));
+    }
+
+    #[inline]
+    fn set_many(
+        &mut self,
+        token: Result<
+            Vec<Self::Token>,
+            <<Self as LexerInternal<'source>>::Token as Logos<'source>>::Error,
+        >,
+    ) {
+        self.token = ManuallyDrop::new(Some(token.map(OneOrMany::Many)));
     }
 }

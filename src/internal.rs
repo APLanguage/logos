@@ -44,6 +44,14 @@ pub trait LexerInternal<'source> {
             <<Self as LexerInternal<'source>>::Token as Logos<'source>>::Error,
         >,
     );
+
+    fn set_many(
+        &mut self,
+        token: Result<
+            Vec<Self::Token>,
+            <<Self as LexerInternal<'source>>::Token as Logos<'source>>::Error,
+        >,
+    );
 }
 
 pub trait CallbackResult<'s, P, T: Logos<'s>> {
@@ -85,6 +93,16 @@ impl<'s, P, T: Logos<'s>> CallbackResult<'s, P, T> for Option<P> {
             Some(product) => lex.set(Ok(c(product))),
             None => lex.set(Err(T::Error::default())),
         }
+    }
+}
+
+impl<'s, T: Logos<'s>> CallbackResult<'s, (), T> for Vec<T> {
+    #[inline]
+    fn construct<Constructor>(self, _: Constructor, lex: &mut Lexer<'s, T>)
+    where
+        Constructor: Fn(()) -> T,
+    {
+        lex.set_many(Ok(self))
     }
 }
 

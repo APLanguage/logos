@@ -172,3 +172,27 @@ mod any_token_callback {
         );
     }
 }
+
+mod vec_callback {
+    use super::*;
+
+    // Adaption of data test for (_) -> Token callbacks
+    #[derive(Logos, Debug, PartialEq)]
+    #[logos(skip r"[ \t\n\f]+")]
+    enum Token {
+        #[regex(r"\S+", |_| vec![Token::Test])]
+        Test,
+    }
+
+    #[test]
+    fn vec_callback() {
+        let tokens: Vec<_> = Token::lexer("Hello").collect();
+
+        assert_eq!(
+            tokens,
+            &[
+                Ok(Token::Test),
+            ]
+        );
+    }
+}
