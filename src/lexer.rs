@@ -220,12 +220,11 @@ where
     #[inline]
     fn next(&mut self) -> Option<Result<Token, Token::Error>> {
         if let Some(v) = &mut self.many {
-            let len = v.len();
-            if len == 0 {
+            if v.is_empty() {
                 self.many = None;
                 return self.next()
             }
-            return Some(Ok(v.remove(len - 1)))
+            return Some(Ok(v.remove(0)))
         }
         self.token_start = self.token_end;
 

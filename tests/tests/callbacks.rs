@@ -180,8 +180,9 @@ mod vec_callback {
     #[derive(Logos, Debug, PartialEq)]
     #[logos(skip r"[ \t\n\f]+")]
     enum Token {
-        #[regex(r"\S+", |_| vec![Token::Test])]
-        Test,
+        #[regex(r"\S+", |_| vec![Token::A, Token::B])]
+        A,
+        B
     }
 
     #[test]
@@ -191,7 +192,8 @@ mod vec_callback {
         assert_eq!(
             tokens,
             &[
-                Ok(Token::Test),
+                Ok(Token::A),
+                Ok(Token::B),
             ]
         );
     }
